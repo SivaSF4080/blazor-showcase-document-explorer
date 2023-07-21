@@ -3,7 +3,7 @@
 @using Syncfusion.Blazor.FileManager
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Popups
-@using System.Text
+@using System.Text 
 
     <div class="loading_indicator @OverlayStyle">
         <div class="e-de-spinner-pane">
@@ -109,7 +109,7 @@
                     <FileManagerToolbarSettings Items="@_toolItems"></FileManagerToolbarSettings>
                     <FileManagerContextMenuSettings File="@_fileMenu" Folder="@_folderMenu" Layout="@_layoutMenu"></FileManagerContextMenuSettings>
                     <FileManagerNavigationPaneSettings Visible="false"></FileManagerNavigationPaneSettings>
-                    <FileManagerEvents OnSend="BeforeSend" ToolbarCreated="ToolbarCreate" MenuOpened="MenuOpen" OnMenuClick="MenuClick"
+                    <FileManagerEvents ToolbarItemClicked="UploadClick" OnSend="BeforeSend" ToolbarCreated="ToolbarCreate" MenuOpened="MenuOpen" OnMenuClick="MenuClick"
                                        OnFileOpen="FileOpen" OnFileLoad="FileLoad" BeforePopupOpen="PopupBefore" PopupOpened="PopupOpened" PopupClosed="PopupClosed"></FileManagerEvents>
                 </SfFileManager>
                 <div id="file-overlay" class="e-file-overlay @_fileOverlayDisplay"></div>
@@ -332,6 +332,13 @@
             AjaxSettings["data"] = modifiedDataString;
             string returnString = JsonConvert.SerializeObject(AjaxSettings);
             args.AjaxSettings = JsonConvert.DeserializeObject<object>(returnString);
+        }
+    }
+    private async Task UploadClick(ToolbarClickEventArgs args)
+    {
+        if(args.Item.Text == "Upload" && (!args.Cancel))        
+        {             
+            await JSRuntime.InvokeVoidAsync("alert", "This is an security purpose alert message.");         
         }
     }
     private void HamburgerClick()
