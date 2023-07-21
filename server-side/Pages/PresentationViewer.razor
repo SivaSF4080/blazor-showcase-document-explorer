@@ -87,25 +87,25 @@
             {
                 Newtonsoft.Json.Linq.JArray jArray = (Newtonsoft.Json.Linq.JArray)JsonConvert.DeserializeObject(output);
                 string sfdt = ((JValue)jArray[0]).Value.ToString();
-                await _viewer.Load(sfdt, null);
+                await _viewer.LoadAsync(sfdt, null);
             }
         }
     }
 
     protected async void OnDocumentLoaded(LoadEventArgs args)
     {
-        await _viewer.OpenThumbnailPane();
-        _bottomToolbar.TotalPages = await _viewer.GetPageCount();
+        await _viewer.OpenThumbnailPaneAsync ();
+        _bottomToolbar.TotalPages = await _viewer.GetPageCountAsync();
         DocumentName = "";
         OverlayStyle = "overlayHide";
         StateHasChanged();
     }
 
-    private void BackClickHandler()
+    private async void BackClickHandler()
     {
         if (_viewer != null)
         {
-            _viewer.Unload();
+           await _viewer.UnloadAsync();
         }
         if (SubPath != null)
         {
@@ -127,14 +127,14 @@
 
     private async void ShowHideThumbnail(bool args)
     {
-        await _viewer.OpenThumbnailPane();
+        await _viewer.OpenThumbnailPaneAsync();
         _isThumbnailVisible = !_isThumbnailVisible;
         ToogleBottomToolBarVisibility();
     }
 
     private async void Goto(int args)
     {
-        await _viewer.GoToPage(args);
+        await _viewer.GoToPageAsync(args);
     }
 
     private async void FileToolBar(string action)
@@ -142,14 +142,14 @@
         switch (action)
         {
             case "PreviousPage":
-                await _viewer.GoToPreviousPage();
+                await _viewer.GoToPreviousPageAsync();
                 break;
             case "NextPage":
-                await _viewer.GoToNextPage();
+                await _viewer.GoToNextPageAsync();
                 break;
             case "ZoomIn":
-                await _viewer.ZoomIn();
-                Zoom = await _viewer.GetZoomPercentage();
+                await _viewer.ZoomInAsync();
+                Zoom = await _viewer.GetZoomPercentageAsync();
                 if (_viewer.ZoomValue >= 400)
                 {
                     _bottomToolbar.ZoomInDisable = true;
@@ -158,8 +158,8 @@
                 StateHasChanged();
                 break;
             case "ZoomOut":
-                await _viewer.ZoomOut();
-                Zoom = await _viewer.GetZoomPercentage();
+                await _viewer.ZoomOutAsync();
+                Zoom = await _viewer.GetZoomPercentageAsync();
                 if (_viewer.ZoomValue <= 10)
                 {
                     _bottomToolbar.ZoomOutDisable = true;
@@ -171,7 +171,7 @@
                 await JSRuntime.InvokeVoidAsync("fullScreen", "PptView_pageViewContainer");
                 break;
             case "Print":
-                await _viewer.Print();
+                await _viewer.PrintAsync();
                 break;
         }
     }

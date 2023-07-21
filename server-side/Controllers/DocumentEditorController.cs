@@ -12,6 +12,7 @@ using Syncfusion.DocIORenderer;
 using Syncfusion.Pdf;
 using Syncfusion.Blazor.PdfViewer;
 using DocumentExplorer.Models;
+using SkiaSharp;
 
 namespace DocumentExplorer.Controllers
 {
@@ -66,8 +67,20 @@ namespace DocumentExplorer.Controllers
             pdfExportImage.Load(outputStream);
 
             //Exports the PDF document pages into images
-            Bitmap[] bitmapimage = pdfExportImage.ExportAsImage(0, pdfExportImage.PageCount-1);
-            foreach (Bitmap bitmap in bitmapimage)
+            SKBitmap[] bitmapimage = pdfExportImage.ExportAsImage(0, pdfExportImage.PageCount - 1);
+            Bitmap[] bitmapImages = new Bitmap[bitmapimage.Length];
+
+            for (int i = 0; i < bitmapimage.Length; i++)
+            {
+                using (SKImage skImage = SKImage.FromBitmap(bitmapimage[i]))
+                using (SKData skData = skImage.Encode(SKEncodedImageFormat.Png, 100))
+                using (System.IO.MemoryStream stream = new System.IO.MemoryStream(skData.ToArray()))
+                {
+                    bitmapImages[i] = new Bitmap(stream);
+                }
+            }
+
+            foreach (Bitmap bitmap in bitmapImages)
             {
                 using (MemoryStream ms = new MemoryStream())
                 {

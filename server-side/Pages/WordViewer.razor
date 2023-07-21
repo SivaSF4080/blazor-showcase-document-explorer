@@ -90,7 +90,7 @@
     {
         OverlayStyle = "overlayShow";
         UpdateThumbnailView();
-        await _documenteditor.Resize();
+        await _documenteditor.ResizeAsync();
         ToogleBottomToolBarVisibility();
         OverlayStyle = "overlayHide";
         StateHasChanged();
@@ -113,7 +113,7 @@
     private async void GotoAction(int pageNum)
     {
         _thumbnail.GotoPage(pageNum);
-        await _documenteditor.ScrollToPage(pageNum);
+        await _documenteditor.ScrollToPageAsync(pageNum);
     }
     private async void FileToolBar(string action)
     {
@@ -129,16 +129,16 @@
                 await JSRuntime.InvokeVoidAsync("fullScreen", "DocEdit");
                 break;
             case "Print":
-                await _documenteditor.Print();
+                await _documenteditor.PrintAsync();
                 break;
         }
     }
     #endregion
 
     #region Thumbnailpane Interaction
-    private void GotoSlectedPage(int args)
+    private async void GotoSlectedPage(int args)
     {
-        _documenteditor.ScrollToPage(args);
+        await _documenteditor.ScrollToPageAsync(args);
         _bottomToolbar.CurrentPageNumber = args;
     }
     #endregion
@@ -146,7 +146,7 @@
     #region DocumentEditor Event
     private async void AfterCreated()
     {
-        await _documenteditor.Resize();
+        await _documenteditor.ResizeAsync();
         HttpResponseMessage docresponse;
         if (SubPath != null)
         {
@@ -182,11 +182,11 @@
                 images.Add(item.Value.ToString());
             }
             _thumbnail.RenderThumbnail(images.ToArray());
-            await _documenteditor.Open(sfdt);
+            await _documenteditor.OpenAsync(sfdt);
         }
-        await _documenteditor.Resize();
+        await _documenteditor.ResizeAsync();
         _thumbnail.SelectFirstPage();
-        _bottomToolbar.TotalPages = await _documenteditor.GetPageCount();
+        _bottomToolbar.TotalPages = await _documenteditor.GetPageCountAsync();
         _bottomToolbar.Refresh();
         DocumentName = "";
         OverlayStyle = "overlayHide";

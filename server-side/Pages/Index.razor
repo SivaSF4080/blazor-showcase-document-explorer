@@ -51,7 +51,7 @@
         @*Content section*@
         <div id="LayoutContent" class="e-mainLayout-content">
             @*sidebar content*@
-            <SfSidebar @ref="_sidebar" Animate="false" Target=".e-mainLayout-content" MediaQuery="(min-width: 600px)" Width="260px" Type=SidebarType.Over EnableGestures="false"
+            <SfSidebar @ref="_sidebar" Animate="false" @bind-IsOpen="SidebarToggle" Target=".e-mainLayout-content" MediaQuery="(min-width: 600px)" Width="260px" Type=SidebarType.Over EnableGestures="false"
                        OnClose="SidebarClose" OnOpen="SidebarOpen">
                 <ChildContent>
                     @*user icon for resolution < 600px*@
@@ -100,7 +100,7 @@
             </SfSidebar>
             <div id="RightLayout" class="e-right-layout">
                 @*file manager*@
-                <SfFileManager @ref="_fileManager" Height="100%" SelectedItems="@SelectedItems" Path="@Path" ShowThumbnail="@(Field!="Trash")" PopupTarget="BODY">
+                <SfFileManager @ref="_fileManager" TValue="FileManagerDirectoryContent" Height="100%" SelectedItems="@SelectedItems" Path="@Path" ShowThumbnail="@(Field!="Trash")" PopupTarget="BODY">
                     <FileManagerAjaxSettings Url=@(NavigationManager.BaseUri + "api/"+ (Field=="Shared"?"SharedFiles":(Field=="Trash"?"Trash":"FileManager"))+"/FileOperations")
                                              GetImageUrl=@(NavigationManager.BaseUri + "api/"+(Field=="Shared"?"SharedFiles":(Field=="Trash"?"Trash":"FileManager"))+"/GetImage")
                                              DownloadUrl=@(NavigationManager.BaseUri + "api/"+(Field=="Shared"?"SharedFiles":(Field=="Trash"?"Trash":"FileManager"))+"/Download")
@@ -109,7 +109,7 @@
                     <FileManagerToolbarSettings Items="@_toolItems"></FileManagerToolbarSettings>
                     <FileManagerContextMenuSettings File="@_fileMenu" Folder="@_folderMenu" Layout="@_layoutMenu"></FileManagerContextMenuSettings>
                     <FileManagerNavigationPaneSettings Visible="false"></FileManagerNavigationPaneSettings>
-                    <FileManagerEvents OnSend="BeforeSend" ToolbarCreated="ToolbarCreate" MenuOpened="MenuOpen" OnMenuClick="MenuClick"
+                    <FileManagerEvents OnSend="BeforeSend" TValue="FileManagerDirectoryContent" ToolbarItemClicked="UploadClick" ToolbarCreated="ToolbarCreate" MenuOpened="MenuOpen" OnMenuClick="MenuClick"
                                        OnFileOpen="FileOpen" OnFileLoad="FileLoad" BeforePopupOpen="PopupBefore" PopupOpened="PopupOpened" PopupClosed="PopupClosed"></FileManagerEvents>
                 </SfFileManager>
                 <div id="file-overlay" class="e-file-overlay @_fileOverlayDisplay"></div>
@@ -155,10 +155,11 @@
 </div>
 @code {
 
-    private SfFileManager _fileManager;
+    private SfFileManager<FileManagerDirectoryContent> _fileManager;
     private SfTreeView<OptionsDataModel> _treeObj;
     private SfSidebar _sidebar;
     private SfDialog _dialog;
+    public bool SidebarToggle = false;
     private bool ShowThumbnail = true;
     private bool _isThumbNailChange = false;
     private string[] _selectedTreeItem = new string[] { "1" };
@@ -235,7 +236,7 @@
         OverlayStyle = "overlayHide";
         if (!firstRender)
         {
-            if (_fileManager.IsRendered && SelectedPath != null & SelectedFilename != null)
+            if (_fileManager.EnableRtl && SelectedPath != null & SelectedFilename != null)
             {
                 SelectedPath = SelectedFilename = null;
                 _fileOverlayDisplay = "e-file-hide-overlay";
@@ -250,13 +251,13 @@
     {
         _isUnSupported = false;
     }
-    public void Refresh()
+    public async void Refresh()
     {
-        _fileManager.Refresh();
+        await _fileManager.RefreshFilesAsync();
     }
-    private void TreeSelect(NodeSelectEventArgs args)
+    private async void TreeSelect(NodeSelectEventArgs args)
     {
-        _fileManager.ClearSelection();
+        await _fileManager.ClearSelectionAsync();
         //To avoid file resfreshing if the selection change invloves shared Trash as showThumbNail change triggers which refreshFiles.
         _isThumbNailChange = (_treeNode == "5") || (args.NodeData.Id == "5");
         ShowThumbnail = args.NodeData.Id != "5";
@@ -315,28 +316,41 @@
         {
             //Reset the path to make the filter work from route path
             Path = "/";
-            _fileManager.RefreshFiles();
+            await _fileManager.RefreshFilesAsync();
         }
     }
-    private void BeforeSend(BeforeSendEventArgs args)
+   private void BeforeSend(BeforeSendEventArgs args)
+{
+    if (_isThumbNailChange)
     {
-        if (_isThumbNailChange) { _isThumbNailChange = false; args.Cancel = true; return; }
-        if (args.Action != "Upload")
-        {
-            string AjaxSettingsString = JsonConvert.SerializeObject(args.AjaxSettings);
-            Dictionary<string, dynamic> AjaxSettings = JsonConvert.DeserializeObject<Dictionary<string, dynamic>>(AjaxSettingsString);
-            string dataString = AjaxSettings["data"];
-            Dictionary<string, dynamic> data = JsonConvert.DeserializeObject<Dictionary<string, dynamic>>(dataString);
-            data.Add("RootType", Field);
-            string modifiedDataString = JsonConvert.SerializeObject(data);
-            AjaxSettings["data"] = modifiedDataString;
-            string returnString = JsonConvert.SerializeObject(AjaxSettings);
-            args.AjaxSettings = JsonConvert.DeserializeObject<object>(returnString);
-        }
+        _isThumbNailChange = false;
+        args.Cancel = true;
+        return;
     }
+
+    if (args.Action != "Upload")
+    {
+        string AjaxSettingsString = JsonConvert.SerializeObject(args.AjaxSettings);
+        Dictionary<string, dynamic> AjaxSettings = JsonConvert.DeserializeObject<Dictionary<string, dynamic>>(AjaxSettingsString);
+        string dataString = AjaxSettings["data"];
+        Dictionary<string, dynamic> data = JsonConvert.DeserializeObject<Dictionary<string, dynamic>>(dataString);
+        data.Add("RootType", Field);
+        string modifiedDataString = JsonConvert.SerializeObject(data);
+        AjaxSettings["data"] = modifiedDataString;
+        string returnString = JsonConvert.SerializeObject(AjaxSettings);
+        args.AjaxSettings = JsonConvert.DeserializeObject<Syncfusion.Blazor.FileManager.FileManagerAjaxSettings>(returnString);
+    }
+}
+private async Task UploadClick(ToolbarClickEventArgs<FileManagerDirectoryContent> args)
+{
+    if(args.Item.Text == "Upload" && (!args.Cancel))        
+    {             
+        await JSRuntime.InvokeVoidAsync("alert", "This is an security purpose alert message.");         
+    }
+}
     private void HamburgerClick()
     {
-        _sidebar.Toggle();
+        SidebarToggle = !SidebarToggle;
     }
     private void ToolbarClick(Syncfusion.Blazor.Navigations.ClickEventArgs args)
     {
@@ -350,9 +364,9 @@
                 break;
         }
     }
-    private void NewClick()
+    private async void NewClick()
     {
-        _fileManager.CreateFolder();
+        await _fileManager.CreateFolderAsync();
     }
     private void SidebarOpen()
     {
@@ -371,19 +385,19 @@
     }
     private async void PopupOpened(PopupOpenCloseEventArgs args)
     {
-        await JSRuntime.InvokeVoidAsync("setDialogDrag", args.Element.ID);
+        @* await JSRuntime.InvokeVoidAsync("setDialogDrag", args.Element.ID); *@
     }
     private void PopupClosed()
     {
         _dialogCount--;
     }
-    private async void MenuOpen(MenuOpenEventArgs args)
+    private async void MenuOpen(MenuOpenEventArgs<FileManagerDirectoryContent> args)
     {
 
         if ((Field != "Shared") && (Field != "Trash"))
         {
             if (args.IsSubMenu && (args.MenuType == "Layout")) { return; }
-            foreach (MenuItemModel menu in args.Items)
+            foreach (Syncfusion.Blazor.FileManager.MenuItemModel menu in args.Items)
             {
                 if (menu.Text == "Star")
                 {
@@ -391,12 +405,12 @@
                 }
             }
             MenuTargetId = _mapId.ToString(); _mapId++;
-            await args.Target.SetAttribute<string>("data-mapId", MenuTargetId);
+            @* await args.Target.SetAttribute<string>("data-mapId", MenuTargetId); *@
             MenuTargetData = JsonConvert.SerializeObject(args.FileDetails);
         }
         else if (Field == "Trash" && !args.IsSubMenu)
         {
-            foreach (MenuItemModel menu in args.Items)
+            foreach (Syncfusion.Blazor.FileManager.MenuItemModel menu in args.Items)
             {
                 switch (menu.Text)
                 {
@@ -411,7 +425,7 @@
             }
         }
     }
-    private async void MenuClick(MenuClickEventArgs args)
+    private async void MenuClick(MenuClickEventArgs<FileManagerDirectoryContent> args)
     {
         if (args.Item.Id == _fileManager.ID + "_cm_star")
         {
@@ -427,14 +441,14 @@
                 ToggleStarred(fileDetails[0]["filterPath"] + fileDetails[0]["name"], false);
                 if (this.Field == "Starred")
                 {
-                    await _fileManager.ClearSelection();
-                    await _fileManager.RefreshFiles();
+                    await _fileManager.ClearSelectionAsync();
+                    await _fileManager.RefreshFilesAsync();
                 }
             }
         }
         if (args.Item.Id == _fileManager.ID + "_cm_restore")
         {
-            List<object> files = await _fileManager.GetSelectedFiles();
+            List<Syncfusion.Blazor.FileManager.FileManagerDirectoryContent> files =  _fileManager.GetSelectedFiles();
             if (files.Count != 0) { Restore(args.FileDetails); }
         }
         if (args.Item.Id == _fileManager.ID + "_cm_restoreall")
@@ -444,14 +458,14 @@
     }
     private void ToolbarCreate(ToolbarCreateEventArgs args)
     {
-        List<Syncfusion.Blazor.FileManager.ItemModel> items = args.Items;
-        foreach (Syncfusion.Blazor.FileManager.ItemModel item in items)
+        List<Syncfusion.Blazor.FileManager.ToolBarItemModel> items = args.Items;
+        foreach (Syncfusion.Blazor.FileManager.ToolBarItemModel item in items)
         {
             if (item.Id == _fileManager.ID + "_tb_newfolder") { item.CssClass = "e-FM-newfolder"; }
             if (item.Id == _fileManager.ID + "_tb_upload") { item.CssClass = "e-FM-upload"; }
         }
     }
-    private void FileOpen(FileOpenEventArgs args)
+    private async void FileOpen(FileOpenEventArgs<FileManagerDirectoryContent> args)
     {
         if (Field == "Trash") { args.Cancel = true; return; }
         string dataString = JsonConvert.SerializeObject(args.FileDetails);
@@ -501,15 +515,15 @@
             {
                 _treeSelectFlag = true;
                 _selectedTreeItem = new string[] { "1" };
-                _treeObj.DataBind();
+                @* _treeObj.DataBind(); *@
                 args.Cancel = true;
                 string newPath = (fileDetails["filterPath"] + fileDetails["name"] + "/");
                 Path = newPath.Replace('\\', '/');
-                _fileManager.RefreshFiles();
+                await _fileManager.RefreshFilesAsync();
             }
         }
     }
-    private async void FileLoad(FileLoadEventArgs args)
+    private async void FileLoad(FileLoadEventArgs<FileManagerDirectoryContent> args)
     {
         string dataString = JsonConvert.SerializeObject(args.FileDetails);
         Dictionary<string, dynamic> fileDetails = JsonConvert.DeserializeObject<Dictionary<string, dynamic>>(dataString);
@@ -518,15 +532,15 @@
     || fileDetails["type"] == Constants.Doc || fileDetails["type"] == Constants.Rtf || fileDetails["type"] == Constants.Txt || fileDetails["type"] == Constants.Pdf))
         {
             string url = GetImageUrl(fileDetails);
-            DOM ele = args.Element;
-            string val = Convert.ToString((await ele.GetAttribute<string>("data-uid")));
-            await ele.AddClass(new string[] { "e-file-preview-image" });
-            await JSRuntime.InvokeVoidAsync("setSpinnerPreview", val);
+            @* DOM ele = args.Element; *@
+            @* string val = Convert.ToString((await ele.GetAttribute<string>("data-uid")));
+            await ele.AddClass(new string[] { "e-file-preview-image" }); *@
+            @* await JSRuntime.InvokeVoidAsync("setSpinnerPreview", val); *@
             string anm = fileDetails["name"];
             string previewImage = await JSRuntime.InvokeAsync<string>("getLocalCacheImage", anm);
             if (previewImage != null)
             {
-                await JSRuntime.InvokeVoidAsync("setPreview", val, previewImage);
+                @* await JSRuntime.InvokeVoidAsync("setPreview", val, previewImage); *@
             } else {
                 HttpRequestMessage docrequest = new HttpRequestMessage(HttpMethod.Post, NavigationManager.BaseUri + "api/Preview/GetPreview");
                 docrequest.Content = new StringContent(JsonConvert.SerializeObject(new { Path = (fileDetails["filterPath"] + fileDetails["name"]) }), Encoding.UTF8, "application/json");
@@ -538,7 +552,7 @@
                     {
                         string name = fileDetails["name"];
                         await JSRuntime.InvokeVoidAsync("setLocalCacheImage", name, output);
-                        await JSRuntime.InvokeVoidAsync("setPreview", val, output);
+                        @* await JSRuntime.InvokeVoidAsync("setPreview", val, output); *@
                     }
                     else
                     {
@@ -562,7 +576,7 @@
                                 iconCss = "e-fe-pptx";
                                 break;
                         }
-                        await JSRuntime.InvokeVoidAsync("revertToIconPreview", val, iconCss);
+                        @* await JSRuntime.InvokeVoidAsync("revertToIconPreview", val, iconCss); *@
                     }
                 }
             }
@@ -571,11 +585,11 @@
         if ((args.Module == "LargeIconsView" || args.Module == "DetailsView") && (Field != "Shared") && (Field != "Trash") && (fileDetails["starred"]))
         {
 
-            DOM ele = args.Element;
+            @* DOM ele = args.Element; *@
             string val = starid.ToString();
             starid++;
-            await ele.AddClass(new string[] { "e-file-star" });
-            await ele.SetAttribute<string>("data-starid", val);
+            @* await ele.AddClass(new string[] { "e-file-star" });
+            await ele.SetAttribute<string>("data-starid", val); *@
             bool isGrid = args.Module == "DetailsView";
             await JSRuntime.InvokeVoidAsync("showStar", val, isGrid);
 
@@ -598,8 +612,8 @@
         HttpResponseMessage response = await Http.SendAsync(request);
         if (response.IsSuccessStatusCode)
         {
-            await _fileManager.ClearSelection();
-            await _fileManager.RefreshFiles();
+            await _fileManager.ClearSelectionAsync();
+            await _fileManager.RefreshFilesAsync();
         }
     }
     private async void EmptyTrash()
@@ -609,8 +623,8 @@
         HttpResponseMessage response = await Http.SendAsync(request);
         if (response.IsSuccessStatusCode)
         {
-            await _fileManager.ClearSelection();
-            await _fileManager.RefreshFiles();
+            await _fileManager.ClearSelectionAsync();
+            await _fileManager.RefreshFilesAsync();
         }
     }
     private string GetImageUrl(Dictionary<string, dynamic> data)
